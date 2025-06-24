@@ -1,79 +1,88 @@
 #!/bin/bash
 
-path_por_defecto=$HOME #Si el usuario no ingresa ningun directorio como parametro se envia el directorio corriente de trabajo.
-dir_backup="/home/devops/Obligatorio2025/BackupScripts/" # Directorio donde guardar el backup.
+dir_backup="/home/devops/Obligatorio2025/BackupScripts" # Directorio donde guardar el backup.
 nombreFileBackup="backup_SetUID_$(date +%Y%m%d_%H%M%S).tar.gz" # Nombre del archivo de backup. Formateado con fecha y hora.
 logFile="log_$(date +%Y%m%d_%H%M%S).rep" #Nombre del archivo log.
+directorio_utilizado="" #Inicializamos la variable del directorio vacia. dependiendo que se pase como parametro.
+log_archivo=false # Condicion inciada en false para las opcion de guardar los caminos en el archivo log de getopts.
+solo_bash=false # Condicion inciada en false para la condicion de busqueada solo de scripts de bash en getopts.
 
-#Chequearemos las opciones con errores primero
 
-if [ -d "$1" ]
-then
-    echo "El directorio existe..."
-else
-    echo "El directorio no existe, por favor ingrese uno correcto." >&2
-    exit 1
-fi
+function backup {
+    local directorio_used="$1"
+    if [ -z "$directorio_used" ]; # El directorio es vacio usamos $HOME como variable para la variable local $directorio_used.
+    then
+        directorio_used="$HOME"
+    fi
+    # Buscamos solamente todos los directorios los cuales cumplan los requerimientos.
+    # Que sean de tipo regular -type f asi podemos restringir la busqueda a solo estos archivos, luego adicionalmente filtramos que sea ejecutable para cualquiera de los usuarios.
+    # Tar --null y - T, los cuales nos permiten delimitar la entrada por caracteres nulos pasadas a traves de find y ademas -T - indica que lea desde stdin(el resutlado de find) mediante un pipe.
+    find "$directorio_used" -perm -4000 -type f -executable -print0 2>/dev/null | tar --null -T - -czf  "$dir_backup/$nombreFileBackup" 2>/dev/null  
+}
 
-if [ ]
-
-# Utilizaremos el comando getopts ya que nos permite procesar las flags que queremos crear para las 2 opciones de la letra.
-# -c sera la opcion para procesar los caminos absolutos hacia el ejecutable encontrado. Por defecto la busqueda sera recursiva y para archivos regulares.
-# -s sera la opcion para almacenar en el archivo log los ejecutables que sean scripts de bash.
-while getopts ":cs" flags
+# Utilizaremos el comando getopts ya que nos permite procesar los modificadores que queremos crear para las 2 opciones de la letra.
+while getopts ":cb" flags;
 do
     case $flags in
         c)
-            #Agregamos el path relativo hacia el directorio en el archivo log.
-            realpath "$1" | sort > "$dir_backup/$logFile"
+            # -c sera la opcion para procesar los caminos absolutos hacia el ejecutable encontrado. Por defecto la busqueda sera recursiva y para archivos regulares.
+            log_archivo=true
         ;;
-        s)
-            #Buscamos unicamente los archivos que contengan #!/bin/bash
-            if [ "$1" != "" ]
-            then
-            ( 
-                # Abriremos una subshell para poder pasar todo el resultado a un solo archivo mediante un pipe.
-                # Find para los permiso SetUID del usuario Root.
-                # Utilizaremos en find la opcion -print0 para que imprima un caracter nulo asi si existe un nombre que contenga espacios para el path, luego no tendremos problema con la sustitucion de la shell.
-                # Find de por si buscara de forma recursiva asi que no hara falta de indicar alguna expresion regular para buscar archivos ocultos.
-                # Usaremos -type f para que busque solamente archivos regulares, asi restringimos la busqueda.
-                # Utilizaremos tambien la expresion regular con grep -E '^#!/bin/bash' para indicar que solamente buscaremos los archivos que comiencen con esas lineas.
-                find "$1" -user root -perm -4000 -type f -exec grep -E '^#!/bin/bash' -print0 2>/dev/null
-                # Find para los permisos SetUID y Ejecuccion para los usuarios restantes.
-                find "$1" ! -user root -perm -4000 -perm -111 -type f -exec grep -E '^#!/bin/bash' -print0 2>/dev/null
-                # Utilizaremos un Sort para los dos casos con las opciones -z, -u para que ordene, elimine entradas repetidas y nulas (-print0).
-            ) | sort -zu | tar -czf "$dir_backup/$nombreFileBackup" -T --null  --absolute-names
-                else
-            # Haremos exactamente la misma accion pero en caso de que el directorio pasado por la stdin este vacio.
-            (
-                find "$path_por_defecto" -user root -perm -4000 -type f -print0 2>/dev/null
-                find "$path_por_defecto" ! -user root -perm -4000 -perm -111 -type f -print0 2>/dev/null
-            ) | sort -zu | tar -czf "$dir_backup/$nombreFileBackup" -T --null  --absolute-names
-            fi
+        b)
+            # -b sera la opcion para almacenar solamente los ejecutables que sean scripts de bash.
+            solo_bash=true
         ;;
         *)
-            echo "El modificador "-$flag" no existe, solo se aceptan -s y -c debera volver a ingresar las opciones correctamente." >&2
-            exit 3
+            # Si la variable del modificador no es valida salimos con codigo 1.
+            echo "El parametro "-$OPTARG" no es valido, por favor ingrese un parametro valido que sea -c o -s." >&2 
+            exit 1
         ;;    
     esac
-    if [ "$1" != "" ]
-    then
-    ( 
-        # Abriremos una subshell para poder pasar todo el resultado a un solo archivo mediante un pipe.
-        # Find para los permiso SetUID del usuario Root.
-        # Utilizaremos en find la opcion -print0 para que imprima un caracter nulo asi si existe un nombre que contenga espacios para el path, luego no tendremos problema con la sustitucion de la shell.
-        # Find de por si buscara de forma recursiva asi que no hara falta de indicar alguna expresion regular para buscar archivos ocultos.
-        # Usaremos -type f para que busque solamente archivos regulares, asi restringimos la busqueda.
-        find "$1" -user root -perm -4000 -type f -print0 2>/dev/null
-        # Find para los permisos SetUID y Ejecuccion para los usuarios restantes.
-        find "$1" ! -user root -perm -4000 -perm -111 -type f -print0 2>/dev/null
-        # Utilizaremos un Sort para los dos casos con las opciones -z, -u para que ordene, elimine entradas repetidas y nulas (-print0).
-    ) | sort -zu | tar -czf "$dir_backup/$nombreFileBackup" -T --null  --absolute-names
-    else
-    # Haremos exactamente la misma accion pero en caso de que el directorio pasado por la stdin este vacio.
-    (
-        find "$path_por_defecto" -user root -perm -4000 -type f -print0 2>/dev/null
-        find "$path_por_defecto" ! -user root -perm -4000 -perm -111 -type f -print0 2>/dev/null
-    ) | sort -zu | tar -czf "$dir_backup/$nombreFileBackup" -T --null  --absolute-names
-    fi
 done
+# Si la cantidad de parametros coincide con el siguiente parametro que procesara getopts, entonces el directorio es el parametro $OPTIND.
+# Acomodamos la posicion del indice para que el mismo coincida con el directorio en $1. utilizando shift en $OPTIND - 1
+shift $((OPTIND-1))
+
+# Verificamos si el directorio existe, o si el parametro final es vacio.
+if [ -z "$1" ]; then
+    echo "No se ingreso un directorio, se tomara el directorio "$HOME" por defecto."
+    directorio_utilizado="$HOME"
+else
+    if [ ! -d $1 ];
+    then
+        echo "El directorio "$1" no existe por favor indique uno que exista dentro del filesystem." >&2
+        exit 3
+    fi
+    directorio_utilizado="$1"
+fi
+
+#Parametro -c, creamos el archivo log para los path absolutos hacia los ejecutables.
+if [ "$log_archivo" = true ]; #Agregamos el path absoluto del directorio donde este presente el archivo ejecutable al archivo log.
+then
+# Explicacion de while con IFS= read -r -d $'\0', utilizamos esto ya que al imprimir un caracter con el caracter nulo queremos que el delimitador sea el mismo,
+# esto por que queremos el path absoluto de la carpeta, asi podemos evitar no perder alguna carpeta que contenga un espacio dentro su nombre.
+# Read estara delimitado con el caracter vacio, ya que, lo que es imprimimos al final del archivo encontrado para obtener la ruta absoluta del mismo. -print0.
+# IFS sera el un caracter vacio, evitando que se separen las letras en la entrada de find.
+    find "$directorio_utilizado" -perm -4000 -type f -executable -print0 2>/dev/null | while IFS= read -r -d $'\0' archivoEjecutable;do realpath "$archivoEjecutable" 
+    done | sort > "$dir_backup/$logFile"
+fi
+
+#Parametro -b, Buscamos solamente archivos ejecutables de Bash. El incio del archivo debe ser: '^#!/bin/bash'.
+if [ "$solo_bash" = true ];
+then
+    find "$directorio_utilizado" -perm -4000 -type f -executable -print0 2>/dev/null | while IFS= read -r -d $'\0' archivoEjecutable; # Repetimos la estructura de busqueda de archivos ejecutables.
+    do 
+        echo "$archivoEjecutable"
+        if head -n 1 "$archivoEjecutable" 2>/dev/null | egrep -q '^#!/bin/bash'; # Buscamos en al 1er linea unicamente para corroborar que es un script de Bash.
+        then
+            backup "$directorio_utilizado"
+        fi
+    done
+fi
+
+# Si no se especifico ninguna opcion haremos solamente el backup del de los archivos ejecutables.
+if [ "$log_archivo" = false ] && [ "$solo_bash" = false ];
+then
+    echo "No se ingreso ningun modificador (-c o -b), se procedera solamente a realizar el backup de los archivos."
+    backup "$directorio_utilizado"
+fi
