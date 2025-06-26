@@ -21,4 +21,4 @@ objecto_name = f"log_{fecha_formateada}" # Extraemos el nombre del archivo desde
 boto3.client('s3').create_bucket(Bucket=bucket_name) # Asumimos que el bucket de S3 no esta creado aun.
 print(f"El bucket {bucket_name} fue creado con el nombre {objecto_name}")
 s3_client.upload_file(archivo_name, bucket_name, objecto_name) # Subimos los archivos al bucket de s3.
-print(f"El archivo {archivo_name} fue subido a {bucket_name}/{objecto_name}")
+print(f"El archivo {archivo_name} fue subido a {bucket_name}/{objecto_name}, para leerlo en su equipo por favor cambiele la extension a .tar.gz")
