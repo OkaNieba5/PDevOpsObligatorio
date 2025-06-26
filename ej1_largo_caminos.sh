@@ -6,7 +6,7 @@ directorio_utilizado="" #Inicializamos la variable del directorio vacia. dependi
 log_archivo=false # Condicion inciada en false para las opcion de guardar los caminos en el archivo log de getopts.
 solo_bash=false # Condicion inciada en false para la condicion de busqueada solo de scripts de bash en getopts.
 
-mkdir -p "$dir_backup" #Nos aseguramos que el directorio de backup exista y este creado.
+mkdir -p "$dir_backup" #Nos aseguramos que el directorio de backup(directorio temporal) exista y este creado.
 
 function backup {
     local directorio_used="$1"
@@ -109,6 +109,7 @@ fi
 
 #Inciamos el backup.
 backup "$directorio_utilizado"
+mv "$nombreFileBackup" "$HOME" # Movemos el zip hacia el directorio $HOME.
 rm -r "$dir_backup" # Eliminamos el directorio temporal.
 
 # Si no se especifico ninguna opcion haremos solamente el backup del de los archivos ejecutables.
